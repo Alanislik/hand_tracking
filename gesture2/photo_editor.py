@@ -30,7 +30,7 @@ from core.tracker import Landmark, Tracker, open_camera
 from ui.overlay import draw_hand
 
 
-FILTERS = ("original", "bw", "sepia", "blur")
+FILTERS = ("bw", "sepia", "blur")
 
 
 def _clamp(v: float, lo: float, hi: float) -> float:
@@ -104,7 +104,10 @@ class PhotoGestureEngine:
         pink = _tip_above(lm, 20, 18)
         thumb = _thumb_open(lm, side)
         open_score = int(idx) + int(mid) + int(ring) + int(pink) + int(thumb)
-        is_open = open_score >= 3
+        is_open = open_score >= 4
+
+        # Intentional 2-finger gesture (thumb + index only) for zoom.
+        zoom_pose = idx and thumb and (not mid) and (not ring) and (not pink)
 
         # Palm orientation from index-mcp to pinky-mcp axis
         palm_angle = math.degrees(
@@ -112,7 +115,7 @@ class PhotoGestureEngine:
         )
 
         rotate_deg = 0.0
-        if self._last_palm_angle is not None and is_open:
+        if self._last_palm_angle is not None and is_open and not zoom_pose:
             raw = _short_angle_diff(self._last_palm_angle, palm_angle)
             self._rot_ema = self.rot_alpha * raw + (1.0 - self.rot_alpha) * self._rot_ema
             if abs(self._rot_ema) > self.rot_deadzone_deg:
@@ -123,7 +126,7 @@ class PhotoGestureEngine:
 
         spread = _dist(lm, 4, 8)
         zoom_delta = 0.0
-        if self._last_spread is not None and (idx or is_open):
+        if self._last_spread is not None and zoom_pose:
             raw = spread - self._last_spread
             self._zoom_ema = self.zoom_alpha * raw + (1.0 - self.zoom_alpha) * self._zoom_ema
             if abs(self._zoom_ema) > self.zoom_deadzone:
@@ -139,6 +142,8 @@ class PhotoGestureEngine:
         if (
             len(self._wrist_x_hist) >= 4
             and is_open
+            and not zoom_pose
+            and abs(rotate_deg) < 0.9
             and (now - self._last_swipe_ts) > self.swipe_cooldown
         ):
             t0, x0 = self._wrist_x_hist[0]
@@ -256,6 +261,16 @@ class PhotoEditorApp:
             cv2.FONT_HERSHEY_DUPLEX,
             0.55,
             (185, 220, 185),
+            1,
+            cv2.LINE_AA,
+        )
+        cv2.putText(
+            bgr,
+            "Palm rotate | Thumb+Index spread zoom | Swipe switch filter",
+            (16, 76),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.46,
+            (215, 215, 215),
             1,
             cv2.LINE_AA,
         )
