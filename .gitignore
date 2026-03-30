@@ -33,3 +33,6 @@ gesture2/models/
 
 # Local app settings
 *.log
+
+# Local Codex marker
+.codex
