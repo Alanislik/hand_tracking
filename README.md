@@ -48,6 +48,42 @@ python gesture2/main.py --app cursor
 - Windows: при необходимости запускайте терминал с обычными правами; для системных действий курсора могут требоваться повышенные права в legacy-режиме.
 - macOS: разрешите доступ к камере для терминала/IDE.
 
+## Установка на разных ОС (важно)
+Возможны отличия из-за wheel-пакетов `mediapipe`/`opencv-python` и версии Python.
+
+Рекомендуемый Python: `3.10` или `3.11`.
+
+- Kali/Linux:
+```bash
+sudo apt update
+sudo apt install -y python3-venv python3-dev libgl1 libglib2.0-0
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+- Windows (PowerShell):
+```powershell
+py -3.11 -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+- macOS:
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+Если установка `mediapipe` не проходит:
+1. Проверьте версию Python (`python --version`).
+2. Пересоздайте окружение на `3.11`.
+3. Обновите pip/setuptools/wheel и повторите установку.
+
 ## Совместная разработка (GitHub Flow)
 1. Создайте ветку: `git checkout -b feature/<короткое-имя>`
 2. Делайте маленькие коммиты с понятными сообщениями

@@ -229,7 +229,11 @@ class PhotoEditorApp:
         self._status_until = 0.0
 
         self.tracker = Tracker(self.cfg)
-        self.engine = PhotoGestureEngine()
+        # Keep independent temporal state per hand.
+        self.engines: dict[str, PhotoGestureEngine] = {
+            "Left": PhotoGestureEngine(),
+            "Right": PhotoGestureEngine(),
+        }
 
     def _status(self, msg: str, sec: float = 1.1) -> None:
         self.last_status = msg
@@ -299,16 +303,6 @@ class PhotoEditorApp:
         )
         return bgr
 
-    def _pick_main_hand(self, hands):
-        if not hands:
-            return None
-        # Prefer configured cursor hand for stable behavior with two hands.
-        pref = "Right" if self.cfg.handedness == "right" else "Left"
-        for h in hands:
-            if h.handedness == pref:
-                return h
-        return hands[0]
-
     def run(self) -> None:
         cap = open_camera(self.cfg)
         cv2.namedWindow("Gesture Photo Editor", cv2.WINDOW_NORMAL)
@@ -325,18 +319,39 @@ class PhotoEditorApp:
 
                 ts_ms = int((time.time() - start) * 1000)
                 result = self.tracker.detect(cam, ts_ms)
-                hand = self._pick_main_hand(result.hands)
+                now = time.monotonic()
+                rot_steps: list[float] = []
+                zoom_steps: list[float] = []
+                swipe_dirs: list[int] = []
 
-                if hand is not None:
+                for hand in result.hands:
                     draw_hand(cam, hand.landmarks, hand.handedness)
-                    d = self.engine.update(
-                        hand.landmarks, hand.handedness, time.monotonic()
-                    )
-                    self.rotation_deg = (self.rotation_deg + d.rotate_deg) % 360.0
-                    # Multiplicative zoom feels more natural than additive.
-                    self.scale = _clamp(self.scale * (1.0 + d.zoom_delta), 0.25, 3.50)
+                    eng = self.engines.get(hand.handedness)
+                    if eng is None:
+                        eng = PhotoGestureEngine()
+                        self.engines[hand.handedness] = eng
+                    d = eng.update(hand.landmarks, hand.handedness, now)
+
+                    if abs(d.rotate_deg) > 1e-4:
+                        rot_steps.append(d.rotate_deg)
+                    if abs(d.zoom_delta) > 1e-6:
+                        zoom_steps.append(d.zoom_delta)
                     if d.swipe_dir != 0:
-                        self.filter_idx = (self.filter_idx + d.swipe_dir) % len(FILTERS)
+                        swipe_dirs.append(d.swipe_dir)
+
+                # Apply aggregate deltas from all detected hands.
+                if rot_steps:
+                    self.rotation_deg = (self.rotation_deg + (sum(rot_steps) / len(rot_steps))) % 360.0
+                if zoom_steps:
+                    z = 1.0 + (sum(zoom_steps) / len(zoom_steps))
+                    self.scale = _clamp(self.scale * z, 0.25, 3.50)
+
+                # If both directions happen in one frame, cancel out to avoid flicker.
+                if swipe_dirs:
+                    s = sum(swipe_dirs)
+                    if s != 0:
+                        dir_eff = 1 if s > 0 else -1
+                        self.filter_idx = (self.filter_idx + dir_eff) % len(FILTERS)
                         self._status(f"Filter -> {FILTERS[self.filter_idx].upper()}")
 
                 frame = self._render_editor_frame()
@@ -354,6 +369,16 @@ class PhotoEditorApp:
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.47,
                     (220, 220, 220),
+                    1,
+                    cv2.LINE_AA,
+                )
+                cv2.putText(
+                    frame,
+                    f"Hands detected: {len(result.hands)} / 2",
+                    (x0, y0 + 218),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.47,
+                    (210, 245, 210),
                     1,
                     cv2.LINE_AA,
                 )
