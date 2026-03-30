@@ -12,6 +12,7 @@ Changes vs v8:
 """
 from __future__ import annotations
 import os, sys, time, threading
+import argparse
 from collections import deque
 from typing import Optional, Tuple
 
@@ -31,6 +32,7 @@ from core.mapper         import CoordinateMapper
 from core.smoothing      import CursorSmoother
 from input.input_controller import InputController, BaseInputController
 from ui.overlay          import HUDState, draw_frame, draw_hand, draw_face_dots
+from photo_editor        import run_photo_editor
 
 
 class Pipeline:
@@ -393,5 +395,25 @@ class App:
             print("[INFO] Done.")
 
 
+def _parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="GestureControl launcher")
+    p.add_argument(
+        "--app",
+        choices=("editor", "cursor"),
+        default="editor",
+        help="editor = gesture photo editor, cursor = legacy cursor controller",
+    )
+    p.add_argument(
+        "--image",
+        default="",
+        help="Source image path for editor mode",
+    )
+    return p.parse_args()
+
+
 if __name__ == "__main__":
-    App().run()
+    args = _parse_args()
+    if args.app == "cursor":
+        App().run()
+    else:
+        run_photo_editor(image_path=args.image)

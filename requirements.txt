@@ -1,6 +1,7 @@
 numpy>=1.24
 opencv-python>=4.8
 mediapipe>=0.10
+Pillow>=10.0
 
 # Linux fallback backend for cursor control (optional but recommended)
 python-xlib>=0.33
