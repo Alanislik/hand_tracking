@@ -1,0 +1,22 @@
+name: Bug report
+description: Сообщить о проблеме
+labels: [bug]
+body:
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: Что произошло
+      description: Коротко опишите проблему и шаги воспроизведения.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Что ожидалось
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Окружение
+      placeholder: "OS, Python version, device"
